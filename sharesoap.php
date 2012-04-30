@@ -13,6 +13,8 @@
  * @author Tuomas Angervuori <tuomas.angervuori@gmail.com>
  */
 
+namespace ShareSoap;
+
 class Sharepoint {
 	
 	const CHECKIN_MINOR = 0;
