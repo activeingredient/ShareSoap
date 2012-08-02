@@ -139,6 +139,32 @@ class Sharepoint {
 	}
 	
 	/**
+	 * Returns the views available for the specified list
+	 * 
+	 * @param $list Name or GUID of the list
+	 * @returns array Names, URLs and GUIDS for the views available
+	 */
+	public function getViewCollection($list) {
+		$soap = $this->getSoapClient('Views');
+		$options = array('listName' => $list);
+		$xml = $soap->GetViewCollection($options)->GetViewCollectionResult->any;
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		$result = array();
+		foreach($dom->getElementsByTagName('Views') as $views) {
+			foreach($views->getElementsByTagName('View') as $view) {
+				$id = $view->getAttribute('Name');
+				$result[$id] = array();
+				foreach($view->attributes as $attr) {
+					$result[$id][$attr->name] = $attr->value;
+				}
+			}
+		}
+		return $result;
+	}
+	
+	
+	/**
 	 * Returns a schema for the specified list
 	 * 
 	 * @param $list Name or GUID of the list
@@ -329,6 +355,40 @@ class Sharepoint {
 		$conn = $this->getConnection();
 		$result = $conn->head($file);
 		return $result['headers'];
+	}
+	
+	/**
+	 * Creates a folder into a document list
+	 * 
+	 * @param $list List GUID or name
+	 * @param $name Name of the folder
+	 * @returns
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/lists.lists.updatelistitems(v=office.12).aspx
+	 */
+	public function createFolder($list, $name) {
+		/*
+		 <Batch OnError="Continue" PreCalc="TRUE" ListVersion="0" ViewName="{EF2F5A21-0FD0-4654-84ED-112B4F5A48F8}">
+			<Method ID="1" Cmd="New">
+				<Field Name="ID">New</Field>
+				<Field Name="FSObjType">1</Field>
+				<Field Name="BaseName">Name</Field>
+			</Method>
+		</Batch>
+		*/
+		
+		
+		$listOptions = array(
+			'listName' => $list
+		);
+		$actionOptions = array();
+			
+		
+		$soap = $this->getSoapClient('Lists');
+		var_dump($soap);
+		//$soap->UpdateListItems($listOptions);
+		//echo $soap->__getLastRequest();
+		///TODO
 	}
 	
 	/**

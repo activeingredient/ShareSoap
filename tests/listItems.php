@@ -10,15 +10,19 @@ require_once('../sharesoap.php');
 header('Content-Type: text/plain; charset=utf-8');
 
 if($argc < 2) {
-	die("Usage: 'listItems.php <list-name>'\n");
+	die("Usage: 'listItems.php <list-name> [<viewName>]'\n");
 }
 $listName = $argv[1];
+$viewName = null;
+if(isset($argv[2])) {
+	$viewName = $argv[2];
+}
 
 $cfg = parse_ini_file('config.ini',true);
 
 echo "* List items in library '$listName' on site '{$cfg['site']}' (username: '{$cfg['username']}'):\n\n";
 $sp = new \ShareSoap\Sharepoint($cfg['site'],$cfg['username'],$cfg['password']);
-$items = $sp->getListItems($listName);
+$items = $sp->getListItems($listName, $viewName);
 
 print_r($items); //Don't know really whats inside the list, so printing everything
 
