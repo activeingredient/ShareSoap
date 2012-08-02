@@ -143,6 +143,8 @@ class Sharepoint {
 	 * 
 	 * @param $list Name or GUID of the list
 	 * @returns array Names, URLs and GUIDS for the views available
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/views.views.getviewcollection%28v=office.12%29
 	 */
 	public function getViewCollection($list) {
 		$soap = $this->getSoapClient('Views');
