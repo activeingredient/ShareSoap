@@ -360,41 +360,55 @@ class Sharepoint {
 	}
 	
 	/**
+	 * TODO file uploads
+	 */
+	
+	/**
 	 * Creates a folder into a document list
 	 * 
-	 * @param $list List GUID or name
-	 * @param $name Name of the folder
-	 * @returns
+	 * @param $path Path to the folder (eg. "Shared%20documents/Test")
+	 * @returns bool 
+	 * @throws SharepointException creating folder failed
 	 * 
-	 * @link http://msdn.microsoft.com/en-us/library/lists.lists.updatelistitems(v=office.12).aspx
+	 * @link http://msdn.microsoft.com/en-us/library/ms774480(v=office.12)
 	 */
-	public function createFolder($list, $name) {
-		/*
-		 <Batch OnError="Continue" PreCalc="TRUE" ListVersion="0" ViewName="{EF2F5A21-0FD0-4654-84ED-112B4F5A48F8}">
-			<Method ID="1" Cmd="New">
-				<Field Name="ID">New</Field>
-				<Field Name="FSObjType">1</Field>
-				<Field Name="BaseName">Name</Field>
-			</Method>
-		</Batch>
-		*/
-		
-		
-		$listOptions = array(
-			'listName' => $list
-		);
-		$actionOptions = array();
-			
-		
-		$soap = $this->getSoapClient('Lists');
-		var_dump($soap);
-		//$soap->UpdateListItems($listOptions);
-		//echo $soap->__getLastRequest();
-		///TODO
+	public function createFolder($path) {
+		$soap = $this->getSoapClient('Dws');
+		$options = array('url' => $path);
+		$xml = $soap->CreateFolder($options)->CreateFolderResult;
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		//Got error
+		foreach($dom->getElementsByTagName('Error') as $item) {
+			throw new SharepointException("Creating folder failed: " . $item->nodeValue);
+		}
+		return true;
 	}
 	
 	/**
-	 * @todo file uploads
+	 * Deletes a folder from a document list
+	 * 
+	 * @param $path Path to the folder (eg. "Shared%20documents/Test")
+	 * @returns bool 
+	 * @throws SharepointException creating folder failed
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/ms772957(v=office.12)
+	 */
+	public function deleteFolder($path) {
+		$soap = $this->getSoapClient('Dws');
+		$options = array('url' => $path);
+		$xml = $soap->DeleteFolder($options)->DeleteFolderResult;
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		//Got error
+		foreach($dom->getElementsByTagName('Error') as $item) {
+			throw new SharepointException("Deleting folder failed: " . $item->nodeValue);
+		}
+		return true;
+	}
+	
+	/**
+	 * @todo attachments to list items
 	 */
 	/* 
 	public function addAttachment($listId, $listItemId, $filename, $data) { 
