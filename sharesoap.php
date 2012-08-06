@@ -424,6 +424,97 @@ class Sharepoint {
 	}
 	*/
 	
+	/**
+	 * Search content 
+	 * 
+	 * @param $string Search string
+	 * @param $startAt
+	 * @param $count maximum number of results
+	 * @returns array 
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/search.queryservice.query(v=office.12)
+	 */
+	public function search($string, $startAt = null, $count = null) {
+		$soap = $this->getSoapClient('Search');
+		
+		//Create the query xml
+		$dom = new \DOMDocument();
+		
+		$queryPacketElement = $dom->createElement('QueryPacket');
+		$queryElement = $dom->createElement('Query');
+		$contextElement = $dom->createElement('Context');
+		
+		$queryTextElement = $dom->createElement('QueryText', $string);
+		$queryTypeAttribute = $dom->createAttribute('type');
+		$queryTypeAttribute->value = 'STRING';
+		$queryTextElement->appendChild($queryTypeAttribute);
+		
+		$contextElement->appendChild($queryTextElement);
+		$queryElement->appendChild($contextElement);
+		
+		if($startAt || $count) {
+			$rangeElement = $dom->createElement('Range');
+			if($startAt) {
+				$startAtElement = $dom->createElement('StartAt');
+				$startAtElement->nodeValue = $startAt;
+				$rangeElement->appendChild($startAtElement);
+			}
+			if($count) {
+				$countElement = $dom->createElement('Count');
+				$countElement->nodeValue = $count;
+				$rangeElement->appendChild($countElement);
+			}
+			$queryElement->appendChild($rangeElement);
+		}
+		
+		$queryPacketElement->appendChild($queryElement);
+		
+		$dom->appendChild($queryPacketElement);
+		$queryXml = $dom->saveHTML();
+		
+		//Execute the query
+		$xml = $soap->Query(array('queryXml' => $queryXml))->QueryResult;
+		
+		//Parse the result
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		
+		$result = array(
+			'Meta' => array(),
+			'Results' => array()
+		);
+		foreach($dom->getElementsByTagName('ResponsePacket') as $responsePacket) {
+			foreach($responsePacket->getElementsByTagName('Response') as $response) {
+				foreach($response->getElementsByTagName('Status') as $status) {
+					$result['Meta']['Status'] = $status->nodeValue;
+				}
+				foreach($response->getElementsByTagName('Range') as $range) {
+					foreach(array('StartAt','Count','TotalAvailable') as $item) {
+						foreach($range->getElementsByTagName($item) as $node) {
+							$result['Meta'][$item] = $node->nodeValue;
+						}
+					}
+					foreach($range->getElementsByTagName('Results') as $results) {
+						foreach($results->getElementsByTagName('Document') as $document) {
+							$link = null;
+							foreach($document->getElementsByTagName('Action') as $action) {
+								foreach($action->getElementsByTagName('LinkUrl') as $linkUrl) {
+									$link = $linkUrl->nodeValue;
+								}
+							}
+							$result['Results'][$link] = array();
+							foreach(array('Title','Description','Date') as $item) {
+								foreach($document->getElementsByTagName($item) as $node) {
+									$result['Results'][$link][$item] = $node->nodeValue;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return $result;
+	}
 	
 	/**
 	 * Returns information about the collection of groups for the current site collection
