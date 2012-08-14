@@ -113,6 +113,8 @@ class Sharepoint {
 		return $this->soapClients[$section];
 	}
 	
+	
+	
 	/**
 	 * Returns the names and GUIDs for all lists in the site
 	 * 
@@ -164,6 +166,7 @@ class Sharepoint {
 		}
 		return $result;
 	}
+	
 	
 	
 	/**
@@ -267,6 +270,8 @@ class Sharepoint {
 		return $result;
 	}
 	
+	
+	
 	/**
 	 * Checks out a file
 	 * 
@@ -335,6 +340,8 @@ class Sharepoint {
 		return $soap->UndoCheckOut($options)->UndoCheckOutResult;
 	}
 	
+	
+	
 	/**
 	 * Downloads a file
 	 * 
@@ -352,6 +359,7 @@ class Sharepoint {
 	 * 
 	 * @param $file URL to the file (eg. http://your.sharepoint.site/sites/Test Site/Shared Documents/Sample File.txt)
 	 * @returns array File information
+	 * @note Is this really the best way to fetch file information...?
 	 */
 	public function getFileInfo($file) {
 		$conn = $this->getConnection();
@@ -362,6 +370,35 @@ class Sharepoint {
 	/**
 	 * TODO file uploads
 	 */
+	
+	/**
+	 * Retrieves information on file versions
+	 * 
+	 * @param $file URL of the file (eg. "Shared Documents/Sample File.txt")
+	 * @return array List of file versions
+	 * @link http://msdn.microsoft.com/en-us/library/versions.versions.getversions(v=office.12)
+	 */
+	public function getVersions($file) {
+		$soap = $this->getSoapClient('Versions');
+		$options = array('fileName' => $file);
+		$xml = $soap->GetVersions($options)->GetVersionsResult->any;
+		
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		$versions = array();
+		foreach($dom->getElementsByTagName('results') as $results) {
+			foreach($results->getElementsByTagName('result') as $result) {
+				$version = $result->getAttribute('version');
+				$versions[$version] = array();
+				foreach($result->attributes as $attr) {
+					$versions[$version][$attr->name] = $attr->value;
+				}
+			}
+		}
+		return $versions;
+	}
+	
+	
 	
 	/**
 	 * Creates a folder into a document list
@@ -407,22 +444,78 @@ class Sharepoint {
 		return true;
 	}
 	
+	
+	
 	/**
-	 * @todo attachments to list items
+	 * Get list of list item attachments
+	 * 
+	 * @param $list List id (eg. {747BAF1B-73E2-45ED-9173-2AB0D4E11F30})
+	 * @param $item Item id (eg. 2)
+	 * @returns array List of attachments
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/lists.lists.getattachmentcollection(v=office.12)
 	 */
-	/* 
-	public function addAttachment($listId, $listItemId, $filename, $data) { 
-		$options = array(
-			'listName' => $listId,
-			'listItemId' => $listItemId,
-			'fileName' => $filename,
-			'attachment' => base64_encode($data)
-		);
+	public function getAttachmentCollection($list, $item) {
 		$soap = $this->getSoapClient('Lists');
-		var_dump($soap->AddAttachment($options));
-		exit;
+		$options = array(
+			'listName' => $list,
+			'listItemID' => $item
+		);
+		$xml = $soap->GetAttachmentCollection($options)->GetAttachmentCollectionResult->any;
+		
+		$dom = new \DOMDocument();
+		$dom->loadXML($xml);
+		$result = array();
+		foreach($dom->getElementsByTagName('Attachments') as $attachments) {
+			foreach($attachments->getElementsByTagName('Attachment') as $attachment) {
+				$result[] = $attachment->nodeValue;
+			}
+		}
+		return $result;
 	}
-	*/
+	
+	/**
+	 * Add attachment to a list item
+	 * 
+	 * @param $list List id (eg. {747BAF1B-73E2-45ED-9173-2AB0D4E11F30})
+	 * @param $item Item id (eg. 2)
+	 * @param $filename Filename of the attachement (eg. test.txt)
+	 * @param $data Contents of the attachments
+	 * @returns string Path of the attachment
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/lists.lists.addattachment(v=office.12)
+	 */
+	public function addAttachment($list, $item, $filename, $data) {
+		$soap = $this->getSoapClient('Lists');
+		$options = array(
+			'listName' => $list,
+			'listItemID' => $item,
+			'fileName' => $filename,
+			'attachment' => $data
+		);
+		return $soap->AddAttachment($options)->AddAttachmentResult;
+	}
+	
+	/**
+	 * Delete attachment from a list item
+	 * 
+	 * @param $list List id (eg. {747BAF1B-73E2-45ED-9173-2AB0D4E11F30})
+	 * @param $item Item id (eg. 2)
+	 * @param $url Path of the attachment (eg. http://sharepoint/sites/Testisite/Lists/List test/Attachments/2/test.txt)
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/lists.lists.deleteattachment(v=office.12)
+	 */
+	public function deleteAttachment($list, $item, $url) {
+		$soap = $this->getSoapClient('Lists');
+		$options = array(
+			'listName' => $list,
+			'listItemID' => $item,
+			'url' => $url
+		);
+		$soap->DeleteAttachment($options);
+	}
+	
+	
 	
 	/**
 	 * Search content 
@@ -516,6 +609,8 @@ class Sharepoint {
 		return $result;
 	}
 	
+	
+	
 	/**
 	 * Returns information about the collection of groups for the current site collection
 	 * 
@@ -525,9 +620,8 @@ class Sharepoint {
 	 */
 	public function getGroupCollectionFromSite() {
 		$soap = $this->getSoapClient('Usergroup');
-		$soap->GetGroupCollectionFromSite(); //->GetGroupCollectionFromSiteResult->any['GetGroupCollectionFromSite'];
+		$xml = $soap->GetGroupCollectionFromSite(); //->GetGroupCollectionFromSiteResult->any['GetGroupCollectionFromSite'];
 		$result = array();
-		
 		///FIXME for some strange reason I couldn't parse the response with SoapClient...
 		$xml = $soap->__getLastResponse();
 		$dom = new \DOMDocument();
@@ -568,7 +662,7 @@ class Sharepoint {
 		);
 		$soap = $this->getSoapClient('Usergroup');
 		$xml = $soap->GetUserCollectionFromGroup($options); //->GetUserCollectionFromGroupResult->any['GetUserCollectionFromGroup'];
-			///FIXME for some strange reason I couldn't parse the response with SoapClient...
+		///FIXME for some strange reason I couldn't parse the response with SoapClient...
 		$xml = $soap->__getLastResponse();
 		$dom = new \DOMDocument();
 		$dom->loadXML($xml);
