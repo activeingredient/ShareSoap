@@ -270,7 +270,7 @@ class Sharepoint {
 		return $result;
 	}
 	
-	
+	///TODO add/modify/delete list items
 	
 	/**
 	 * Checks out a file
@@ -343,15 +343,58 @@ class Sharepoint {
 	
 	
 	/**
-	 * Downloads a file
+	 * Download a file
 	 * 
-	 * @param $file URL to the file (eg. http://your.sharepoint.site/sites/Test Site/Shared Documents/Sample File.txt)
+	 * @param $url URL to the file (eg. http://your.sharepoint.site/sites/Test Site/Shared Documents/Sample File.txt)
 	 * @returns data Contents of the file
+	 * @todo Make this accept also relative urls
 	 */
-	public function getFile($file) {
+	public function getFile($url) {
 		$conn = $this->getConnection();
-		$result = $conn->get($file);
+		$result = $conn->get($url);
 		return $result['body'];
+	}
+	
+	/**
+	 * Upload a file into document library
+	 * 
+	 * @param $url URL to the file location in Sharepoint
+	 * @param $data Contents of the file
+	 * @todo Can this be done with soap? Would be nice to be able to also add details to the file (description etc)
+	 */
+	public function putFile($url, $data) {
+		$conn = $this->getConnection();
+		$conn->put($url, $data);
+	}
+	
+	/**
+	 * Copy a file into new location inside Sharepoint
+	 * 
+	 * @param $sourceUrl The URL of the file to be copied
+	 * @param $destinationUrl The URL to which the file should be copied
+	 * 
+	 * @link http://msdn.microsoft.com/en-us/library/copy.copy.copyintoitemslocal(v=office.12)
+	 */
+	public function copyFile($sourceUrl, $destinationUrl) {
+		$soap = $this->getSoapClient('Copy');
+		$options = array(
+			'SourceUrl' => $sourceUrl,
+			'DestinationUrls' => array($destinationUrl)
+		);
+		$response = $soap->CopyIntoItemsLocal($options)->Results->CopyResult;
+		if($response->ErrorCode != 'Success') {
+			throw new SharepointException($response->ErrorMessage);
+		}
+	}
+	
+	/**
+	 * Delete a file from document library
+	 * 
+	 * @param $url URL of the file to be deleted
+	 */
+	public function deleteFile($url) {
+		$conn = $this->getConnection();
+		$conn->delete($url);
 	}
 	
 	/**
@@ -366,10 +409,6 @@ class Sharepoint {
 		$result = $conn->head($file);
 		return $result['headers'];
 	}
-	
-	/**
-	 * TODO file uploads
-	 */
 	
 	/**
 	 * Retrieves information on file versions
