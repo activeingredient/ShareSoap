@@ -69,10 +69,10 @@ class SharepointConnection {
 	
 	public $debug = false;
 	
-	function __construct($host, $user, $password, $port = 80, $domain='', $workstation='') {
+	function __construct($host, $user = null, $password = null, $port = 80, $domain='', $workstation='') {
 		
 		if (!function_exists($function='mcrypt_encrypt')) {
-			throw new SharepointException('NTLM Error: the required "mcrypt" extension is not available');
+			throw new SharepointConnectionException('NTLM Error: the required "mcrypt" extension is not available');
 		}
 		if($port == 443) {
 			$socketHost = 'ssl://' . $host;
@@ -81,7 +81,7 @@ class SharepointConnection {
 			$socketHost = $host;
 		}
 		if (!$this->socket = fsockopen($socketHost, $port, $errno, $errstr, 30)) {
-			throw new SharepointException("NTLM_HTTP failed to open. Error {$errno}: {$errstr}");
+			throw new SharepointConnectionException("NTLM_HTTP failed to open. Error {$errno}: {$errstr}");
 		}
 		$userData = explode('@',$user);
 		if(isset($userData[1])) {
@@ -104,18 +104,26 @@ class SharepointConnection {
 	}
 	
 	public function get($uri, array $headers = array()) {
-		return $this->_request($uri, 'get', null, $headers);
+		return $this->request($uri, 'get', null, $headers);
 	}
 	
 	public function post($uri, $data, array $headers = array()) {
-		return $this->_request($uri, 'post', $data, $headers);
+		return $this->request($uri, 'post', $data, $headers);
+	}
+	
+	public function put($uri, $data, array $headers = array()) {
+		return $this->request($uri, 'put', $data, $headers);
 	}
 	
 	public function head($uri, array $headers = array()) {
-		return $this->_request($uri, 'head', null, $headers);
+		return $this->request($uri, 'head', null, $headers);
 	}
 	
-	protected function _request($uri, $method = null, $data = null, array $headers = array()) {
+	public function delete($uri, array $headers = array()) {
+		return $this->request($uri, 'delete', null, $headers);
+	}
+	
+	public function request($uri, $method = null, $data = null, array $headers = array()) {
 		
 		if(!$method) {
 			if($data) {
@@ -148,6 +156,9 @@ class SharepointConnection {
 		$response = $this->_getResponse($hasBody);
 		
 		if (401 === $response['status']) {
+			if(!$this->user) {
+				throw new SharepointConnectionException('Login required: no username defined');
+			}
 			$this->msg3 = null;
 			if(!$response['NTLM']) {
 				$sendHeaders = $headers;
@@ -159,7 +170,7 @@ class SharepointConnection {
 				$this->_sendHeaders($uri, $sendHeaders, $method);
 				$response = $this->_getResponse($hasBody);
 				if(!$response['NTLM']) {
-					throw new SharepointException('NTLM Authorization failed at step 1');
+					throw new SharepointConnectionException('NTLM Authorization failed at step 1');
 				}
 			}
 			if($response['NTLM']) {
@@ -179,7 +190,7 @@ class SharepointConnection {
 		}
 		
 		if ($response['status'] >= 400) {
-			throw new SharepointResponseException($response['body'], $response['status']);
+			throw new SharepointConnectionException($response['statusMessage'], $response['status']);
 		}
 		
 		return $response;
@@ -188,6 +199,7 @@ class SharepointConnection {
 	protected function _getResponse($hasBody = true) {
 		$response = array(
 			'status' => null,
+			'statusMessage' => null,
 			'headers' => array(),
 			'NTLM' => null,
 			'body' => null
@@ -212,8 +224,9 @@ class SharepointConnection {
 				$line = trim($line);
 				//First line contains the HTTP status code
 				if($isHttpStatus) {
-					$parts = explode(' ', $line);
+					$parts = explode(' ', $line, 3);
 					$response['status'] = (int)$parts[1];
+					$response['statusMessage'] = $parts[2];
 					$isHttpStatus = false;
 				}
 				else {
@@ -353,7 +366,7 @@ class SharepointConnection {
 			$msg2 = base64_decode($ntlm_response);
 			$headers = unpack('a8ID/Vtype/vtarget_length/vtarget_space/Vtarget_offset/Vflags/a8challenge/a8context/vtargetinfo_length/vtargetinfo_space/Vtargetinfo_offset/cOS_major/cOS_minor/vOS_build', $msg2);
 			if ($headers['ID'] != 'NTLMSSP') {
-				throw new SharepointException('Incorrect NTLM Type 2 Message');
+				throw new SharepointConnectionException('Incorrect NTLM Type 2 Message');
 				return false;
 			}
 			$headers['challenge'] = substr($msg2,24,8);

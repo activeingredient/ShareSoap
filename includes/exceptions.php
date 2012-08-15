@@ -5,5 +5,5 @@
 namespace ShareSoap;
 
 class SharepointException extends \Exception { }
-class SharepointResponseException extends SharepointException { }
+class SharepointConnectionException extends SharepointException { }
 class SharepointSoapException extends SharepointException { }
